@@ -4,11 +4,14 @@ import 'dart:developer' as developer;
 import 'package:firebase_ml_vision/firebase_ml_vision.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
-import 'package:pic_to_text/userImagePicker.dart';
+import 'package:clipboard/clipboard.dart';
+
+import 'package:image_picker/image_picker.dart';
+import 'package:pic_to_text/mockData.dart';
 
 void main() => runApp(MaterialApp(
-      debugShowCheckedModeBanner: false,
       home: HomeScreen(),
+      debugShowCheckedModeBanner: false,
     ));
 
 class HomeScreen extends StatefulWidget {
@@ -17,95 +20,133 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
+  final ImagePicker picker = ImagePicker();
+
   String string = "TextRecognition";
   File _userImageFile;
+
+  List<String> history = mockHistory;
+
+  final snackBar = SnackBar(content: Text('Copiado'));
+
   var result = "";
 
-  void _pickedImage(File image) {
-    _userImageFile = image;
+  void _pickImage(ImageSource imageSource) async {
+    final pickedImageFile = await picker.getImage(
+      source: imageSource,
+    );
+
+    if (pickedImageFile != null) {
+      setState(() {
+        _userImageFile = File(pickedImageFile.path);
+      });
+    } else {
+      print('No image was selected');
+    }
   }
 
   recogniseText() async {
-    developer.log('recogniseText was called');
-
     FirebaseVisionImage myImage = FirebaseVisionImage.fromFile(_userImageFile);
     TextRecognizer recognizeText = FirebaseVision.instance.textRecognizer();
     VisionText readText = await recognizeText.processImage(myImage);
 
-    developer.log(readText.text);
+    developer.log('This is the result: ${readText.text}');
 
     setState(() {
       result = readText.text;
+      history = [result] + history;
+      _userImageFile = null;
     });
-  }
-
-  Widget drawerItem(String title, IconData iconData, String _string) {
-    return InkWell(
-      onTap: () {
-        setState(() {
-          string = _string;
-        });
-        Navigator.of(context).pop();
-      },
-      child: Column(
-        children: [
-          ListTile(
-            leading: Icon(iconData),
-            title: Text(
-              title,
-              style: TextStyle(
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          ),
-          Divider()
-        ],
-      ),
-    );
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-        drawer: Drawer(
-          child: Column(
-            children: [
-              Padding(
-                padding: const EdgeInsets.all(18.0),
-                child: Image.network(
-                    "https://1.bp.blogspot.com/-B3K1G5D9sPQ/WvDZJGvkqVI/AAAAAAAAFSc/zx6VYIc0IXQmB8oR4c0i7SKjSNL-2xiTQCLcBGAs/s1600/ml-kit-logo.png"),
-              ),
-              Divider(),
-              drawerItem("Text recognition", Icons.title, "TextRecognition"),
-              drawerItem("Image labeling", Icons.terrain, "ImageLabeling"),
-              drawerItem("Barcode scanning", Icons.workspaces_outline,
-                  "BarcodeScanning"),
-            ],
-          ),
-        ),
-        appBar: AppBar(
-          elevation: 0,
-          title: Text(string),
-          backgroundColor: Colors.blue[300],
-          actions: [
-            IconButton(
-              onPressed: () {
-                if (string == "TextRecognition") recogniseText();
-              },
-              icon: Icon(Icons.check),
-            )
-          ],
-        ),
-        body: SingleChildScrollView(
-          child: Center(
-            child: Column(
-              children: [
-                UserImagePicker(_pickedImage),
-                Padding(
-                    padding: const EdgeInsets.all(16.0), child: Text(result)),
-              ],
-            ),
-          ),
-        ));
+      appBar: AppBar(
+        elevation: 0,
+        title: Text('Pic to Text'),
+        backgroundColor: Colors.amber[400],
+        actions: [
+          IconButton(
+            onPressed: () {
+              recogniseText();
+            },
+            icon: Icon(Icons.add),
+          )
+        ],
+      ),
+      body: Container(
+        child: ListView.builder(
+            padding: const EdgeInsets.all(8),
+            itemCount: history.length,
+            itemBuilder: (BuildContext context, int index) {
+              return ListTile(
+                // trailing: Icon(Icons.delete_rounded),
+                title: Text('${history[index]}'),
+                onTap: () {
+                  FlutterClipboard.copy(history[index]).then((value) {
+                    Scaffold.of(context).showSnackBar(snackBar);
+                  });
+                },
+              );
+            }),
+      ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () {
+          showDialog(
+              context: context,
+              builder: (_) {
+                return AlertDialog(
+                  title: Text(
+                    "Complete your action using..",
+                  ),
+                  actions: [
+                    FlatButton(
+                      onPressed: () {
+                        Navigator.of(context).pop();
+                      },
+                      child: Text(
+                        "Cancel",
+                      ),
+                    ),
+                  ],
+                  content: Container(
+                    height: 120,
+                    child: Column(
+                      children: [
+                        ListTile(
+                          leading: Icon(Icons.camera),
+                          title: Text(
+                            "Camera",
+                          ),
+                          onTap: () {
+                            _pickImage(ImageSource.camera);
+                            Navigator.of(context).pop();
+                          },
+                        ),
+                        Divider(
+                          height: 1,
+                          color: Colors.black,
+                        ),
+                        ListTile(
+                          leading: Icon(Icons.image),
+                          title: Text(
+                            "Gallery",
+                          ),
+                          onTap: () {
+                            _pickImage(ImageSource.gallery);
+                            Navigator.of(context).pop();
+                          },
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              });
+        },
+        child: Icon(Icons.add_a_photo_outlined),
+        backgroundColor: Colors.amberAccent,
+      ),
+    );
   }
 }

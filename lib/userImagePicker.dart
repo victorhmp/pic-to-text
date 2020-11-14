@@ -39,9 +39,9 @@ class _UserImagePickerState extends State<UserImagePicker> {
           child: ClipRRect(
             borderRadius: BorderRadius.circular(10),
             child: Container(
-              color: Colors.orangeAccent.withOpacity(0.3),
-              width: MediaQuery.of(context).size.width,
-              height: 300,
+              // color: Colors.orangeAccent.withOpacity(0.3),
+              // width: MediaQuery.of(context).size.width,
+              height: 400,
               child: _pickedImage != null
                   ? Image(
                       image: FileImage(_pickedImage),
