@@ -1,20 +1,26 @@
 import 'dart:io';
-import 'dart:developer' as developer;
-
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_ml_vision/firebase_ml_vision.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:clipboard/clipboard.dart';
+import 'package:flutter_speed_dial/flutter_speed_dial.dart';
+import 'package:provider/provider.dart';
 
 import 'package:image_picker/image_picker.dart';
+import 'package:pic_to_text/AuthService.dart';
 import 'package:pic_to_text/mockData.dart';
 
-class HomeScreen extends StatefulWidget {
+class HomePage extends StatefulWidget {
+  final User currentUser;
+
+  HomePage(this.currentUser);
+
   @override
-  _HomeScreenState createState() => _HomeScreenState();
+  _HomePageState createState() => _HomePageState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class _HomePageState extends State<HomePage> {
   final ImagePicker picker = ImagePicker();
 
   String string = "TextRecognition";
@@ -47,8 +53,6 @@ class _HomeScreenState extends State<HomeScreen> {
     TextRecognizer recognizeText = FirebaseVision.instance.textRecognizer();
     VisionText readText = await recognizeText.processImage(myImage);
 
-    developer.log('This is the result: ${readText.text}');
-
     setState(() {
       result = readText.text;
       history = [result] + history;
@@ -62,13 +66,13 @@ class _HomeScreenState extends State<HomeScreen> {
       appBar: AppBar(
         elevation: 0,
         title: Text('Pic to Text'),
-        backgroundColor: Colors.amber[400],
+        backgroundColor: Color(0xFFf1c40f),
         actions: [
           IconButton(
-            onPressed: () {
-              recogniseText();
+            onPressed: () async {
+              await Provider.of<AuthService>(context).logout();
             },
-            icon: Icon(Icons.add),
+            icon: Icon(Icons.logout),
           )
         ],
       ),
@@ -78,7 +82,6 @@ class _HomeScreenState extends State<HomeScreen> {
             itemCount: history.length,
             itemBuilder: (BuildContext context, int index) {
               return ListTile(
-                // trailing: Icon(Icons.delete_rounded),
                 title: Text('${history[index]}'),
                 onTap: () {
                   FlutterClipboard.copy(history[index]).then((value) {
@@ -88,63 +91,108 @@ class _HomeScreenState extends State<HomeScreen> {
               );
             }),
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          showDialog(
-              context: context,
-              builder: (_) {
-                return AlertDialog(
-                  title: Text(
-                    "Complete your action using..",
-                  ),
-                  actions: [
-                    FlatButton(
-                      onPressed: () {
-                        Navigator.of(context).pop();
-                      },
-                      child: Text(
-                        "Cancel",
-                      ),
-                    ),
-                  ],
-                  content: Container(
-                    height: 120,
-                    child: Column(
-                      children: [
-                        ListTile(
-                          leading: Icon(Icons.camera),
-                          title: Text(
-                            "Camera",
-                          ),
-                          onTap: () {
-                            _pickImage(ImageSource.camera);
-                            Navigator.of(context).pop();
-                          },
-                        ),
-                        Divider(
-                          height: 1,
-                          color: Colors.black,
-                        ),
-                        ListTile(
-                          leading: Icon(Icons.image),
-                          title: Text(
-                            "Gallery",
-                          ),
-                          onTap: () {
-                            _pickImage(ImageSource.gallery);
-                            Navigator.of(context).pop();
-                          },
-                        ),
-                      ],
-                    ),
-                  ),
-                );
-              });
-        },
+      floatingActionButton: SpeedDial(
         child: Icon(Icons.add_a_photo_outlined),
-        backgroundColor: Colors.amberAccent,
+        backgroundColor: Color(0xFFf1c40f),
+        children: [
+          SpeedDialChild(
+            child: Icon(CupertinoIcons.camera),
+            onTap: () {
+              _pickImage(ImageSource.camera);
+            },
+          ),
+          SpeedDialChild(
+            child: Icon(Icons.image),
+            onTap: () {
+              _pickImage(ImageSource.gallery);
+            },
+          ),
+        ],
       ),
-      drawer: Drawer(),
+      drawer: HomeDrawer(widget.currentUser),
+    );
+  }
+}
+
+class HomeDrawer extends StatefulWidget {
+  final User currentUser;
+
+  HomeDrawer(this.currentUser);
+
+  @override
+  _HomeDrawerState createState() => _HomeDrawerState();
+}
+
+class _HomeDrawerState extends State<HomeDrawer> {
+  @override
+  Widget build(BuildContext context) {
+    return Drawer(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        mainAxisSize: MainAxisSize.max,
+        children: <Widget>[
+          CircleAvatar(
+            backgroundImage: NetworkImage(
+              widget.currentUser.photoURL,
+            ),
+            radius: 80,
+            backgroundColor: Colors.transparent,
+          ),
+          SizedBox(height: 40),
+          Text(
+            'NAME',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: Colors.black54,
+            ),
+          ),
+          Text(
+            widget.currentUser.displayName,
+            style: TextStyle(
+              fontSize: 16,
+              color: Color(0xFF34495e),
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          SizedBox(height: 20),
+          Text(
+            'EMAIL',
+            style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: Colors.black54),
+          ),
+          Text(
+            widget.currentUser.email,
+            style: TextStyle(
+                fontSize: 16,
+                color: Color(0xFF34495e),
+                fontWeight: FontWeight.bold),
+          ),
+          SizedBox(height: 40),
+          RaisedButton(
+            onPressed: () async {
+              await Provider.of<AuthService>(context).logout();
+            },
+            color: Color(0xFFf1c40f),
+            child: Padding(
+              padding: const EdgeInsets.all(8.0),
+              child: Text(
+                'Sign Out',
+                style: TextStyle(
+                  fontSize: 16,
+                  color: Colors.white,
+                ),
+              ),
+            ),
+            elevation: 5,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(40),
+            ),
+          )
+        ],
+      ),
     );
   }
 }
