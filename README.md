@@ -1,6 +1,6 @@
-# pic_to_text
+# PicToText
 
-A new Flutter project.
+PicToText is a simple app that is capable of recognizing text in images.
 
 ## Getting Started
 
