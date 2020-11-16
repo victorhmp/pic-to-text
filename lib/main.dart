@@ -32,7 +32,6 @@ class MyApp extends StatelessWidget {
                   title: 'Pic to Text',
                   debugShowCheckedModeBanner: false,
                   home: FutureBuilder(
-                    // future: AuthService.getUser(),
                     future: Provider.of<AuthService>(context).getUser(),
                     builder: (context, AsyncSnapshot snapshot) {
                       if (snapshot.connectionState == ConnectionState.done) {
@@ -40,7 +39,7 @@ class MyApp extends StatelessWidget {
                             ? HomePage(snapshot.data)
                             : LoginPage();
                       } else {
-                        return Container(color: Colors.white);
+                        return LoadingCircle();
                       }
                     },
                   ),

@@ -1,15 +1,16 @@
 import 'dart:io';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_ml_vision/firebase_ml_vision.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:clipboard/clipboard.dart';
 import 'package:flutter_speed_dial/flutter_speed_dial.dart';
+import 'package:pic_to_text/LoadingState.dart';
 import 'package:provider/provider.dart';
 
 import 'package:image_picker/image_picker.dart';
 import 'package:pic_to_text/AuthService.dart';
-import 'package:pic_to_text/mockData.dart';
 
 class HomePage extends StatefulWidget {
   final User currentUser;
@@ -26,11 +27,35 @@ class _HomePageState extends State<HomePage> {
   String string = "TextRecognition";
   File _userImageFile;
 
-  List<String> history = mockHistory;
+  CollectionReference _users = FirebaseFirestore.instance.collection('users');
 
   final snackBar = SnackBar(content: Text('Copiado'));
 
   var result = "";
+
+  Future<void> _addToHistory(String text, String uid) async {
+    var userCurrentDocument =
+        await FirebaseFirestore.instance.collection('users').doc(uid).get();
+
+    var currentHistory = userCurrentDocument.data()['history'];
+    currentHistory.add(text);
+
+    return _users.doc(uid).update({
+      'history': currentHistory,
+    });
+  }
+
+  Future<void> _removeFromHistory(String text, String uid, int idx) async {
+    var userCurrentDocument =
+        await FirebaseFirestore.instance.collection('users').doc(uid).get();
+
+    List<String> currentHistory = userCurrentDocument.data()['history'];
+    currentHistory.removeAt(idx);
+
+    return _users.doc(uid).update({
+      'history': currentHistory,
+    });
+  }
 
   void _pickImage(ImageSource imageSource) async {
     final pickedImageFile = await picker.getImage(
@@ -53,9 +78,10 @@ class _HomePageState extends State<HomePage> {
     TextRecognizer recognizeText = FirebaseVision.instance.textRecognizer();
     VisionText readText = await recognizeText.processImage(myImage);
 
+    await _addToHistory(readText.text, widget.currentUser.uid);
+
     setState(() {
       result = readText.text;
-      history = [result] + history;
       _userImageFile = null;
     });
   }
@@ -76,20 +102,9 @@ class _HomePageState extends State<HomePage> {
           )
         ],
       ),
-      body: Container(
-        child: ListView.builder(
-            padding: const EdgeInsets.all(8),
-            itemCount: history.length,
-            itemBuilder: (BuildContext context, int index) {
-              return ListTile(
-                title: Text('${history[index]}'),
-                onTap: () {
-                  FlutterClipboard.copy(history[index]).then((value) {
-                    Scaffold.of(context).showSnackBar(snackBar);
-                  });
-                },
-              );
-            }),
+      body: History(
+        snackBar: snackBar,
+        userId: widget.currentUser.uid,
       ),
       floatingActionButton: SpeedDial(
         child: Icon(Icons.add_a_photo_outlined),
@@ -110,6 +125,54 @@ class _HomePageState extends State<HomePage> {
         ],
       ),
       drawer: HomeDrawer(widget.currentUser),
+    );
+  }
+}
+
+class History extends StatelessWidget {
+  const History({
+    Key key,
+    @required this.snackBar,
+    @required this.userId,
+  }) : super(key: key);
+
+  final SnackBar snackBar;
+  final String userId;
+
+  @override
+  Widget build(BuildContext context) {
+    DocumentReference userDocumentReference =
+        FirebaseFirestore.instance.collection('users').doc(this.userId);
+
+    return StreamBuilder(
+      stream: userDocumentReference.snapshots(),
+      builder: (context, snapshot) {
+        if (snapshot.hasError) {
+          return Text("Something went wrong");
+        }
+
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return LoadingCircle();
+        }
+
+        var historyFromCloudStorage = snapshot.data['history'];
+
+        return ListView.builder(
+            padding: const EdgeInsets.all(8),
+            itemCount: historyFromCloudStorage.length,
+            itemBuilder: (BuildContext context, int index) {
+              return ListTile(
+                title: Text('${historyFromCloudStorage[index]}'),
+                onTap: () {
+                  FlutterClipboard.copy(
+                    historyFromCloudStorage[index],
+                  ).then((value) {
+                    Scaffold.of(context).showSnackBar(snackBar);
+                  });
+                },
+              );
+            });
+      },
     );
   }
 }
