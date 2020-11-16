@@ -38,7 +38,7 @@ class _HomePageState extends State<HomePage> {
         await FirebaseFirestore.instance.collection('users').doc(uid).get();
 
     var currentHistory = userCurrentDocument.data()['history'];
-    currentHistory.add(text);
+    currentHistory.insert(0, text);
 
     return _users.doc(uid).update({
       'history': currentHistory,
