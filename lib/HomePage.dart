@@ -45,18 +45,6 @@ class _HomePageState extends State<HomePage> {
     });
   }
 
-  Future<void> _removeFromHistory(String text, String uid, int idx) async {
-    var userCurrentDocument =
-        await FirebaseFirestore.instance.collection('users').doc(uid).get();
-
-    List<String> currentHistory = userCurrentDocument.data()['history'];
-    currentHistory.removeAt(idx);
-
-    return _users.doc(uid).update({
-      'history': currentHistory,
-    });
-  }
-
   void _pickImage(ImageSource imageSource) async {
     final pickedImageFile = await picker.getImage(
       source: imageSource,
@@ -130,7 +118,7 @@ class _HomePageState extends State<HomePage> {
 }
 
 class History extends StatelessWidget {
-  const History({
+  History({
     Key key,
     @required this.snackBar,
     @required this.userId,
@@ -138,11 +126,23 @@ class History extends StatelessWidget {
 
   final SnackBar snackBar;
   final String userId;
+  final _users = FirebaseFirestore.instance.collection('users');
+
+  Future<void> _removeFromHistory(String uid, int idx) async {
+    var userCurrentDocument =
+        await FirebaseFirestore.instance.collection('users').doc(uid).get();
+
+    var currentHistory = userCurrentDocument.data()['history'];
+    currentHistory.removeAt(idx);
+
+    return _users.doc(uid).update({
+      'history': currentHistory,
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
-    DocumentReference userDocumentReference =
-        FirebaseFirestore.instance.collection('users').doc(this.userId);
+    DocumentReference userDocumentReference = _users.doc(this.userId);
 
     return StreamBuilder(
       stream: userDocumentReference.snapshots(),
@@ -162,7 +162,18 @@ class History extends StatelessWidget {
             itemCount: historyFromCloudStorage.length,
             itemBuilder: (BuildContext context, int index) {
               return ListTile(
-                title: Text('${historyFromCloudStorage[index]}'),
+                title: Text(
+                  '${historyFromCloudStorage[index]}',
+                ),
+                trailing: FlatButton(
+                  onPressed: () {
+                    this._removeFromHistory(this.userId, index);
+                  },
+                  child: Icon(
+                    Icons.remove_circle,
+                    color: Colors.red,
+                  ),
+                ),
                 onTap: () {
                   FlutterClipboard.copy(
                     historyFromCloudStorage[index],
