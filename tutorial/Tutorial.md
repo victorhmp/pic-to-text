@@ -145,8 +145,8 @@ Vamos criar a primeira tela básica do app, que será a nossa tela inicial por e
 
    ```yaml
    dependencies:
-   	image_picker: ^0.6.7+14
-   	flutter_speed_dial: ^1.2.5
+     image_picker: ^0.6.7+14
+     flutter_speed_dial: ^1.2.5
    ```
 
    Se você estiver usando o VSCode com a extensão do Flutter, essa alteração fará com que as dependências já sejam instaladas no seu projeto assim que o arquivo for salvo. Caso contrário, execute o seguinte comando:
@@ -404,7 +404,7 @@ Vamos primeiro preparar a interface para mostrar o histórico de consultas feita
 
    Agora o seu app deve estar assim:
 
-   <img src="/Users/victormiranda/BCC/pic_to_text/tutorial/img/home_page_3.png" alt="home_page_3" style="zoom:25%;" />
+   <img src="./img/home_page_3.png" alt="home_page_3" style="zoom:25%;" />
 
 4. Vamos também criar uma função dentro da classe `HomePageState` que vai permitir a adição de itens no histórico:
 
@@ -446,8 +446,8 @@ Agora vamos fazer com que o nosso app possa de fato usar o Firebase. Note que es
    ```yaml
    dependencies:
    	...
-   	firebase_core: "0.5.2"
-   	firebase_ml_vision: ^0.9.9
+     firebase_core: "0.5.2"
+     firebase_ml_vision: ^0.9.9
    ```
 
    Como sempre, execute `flutter pub get`, se o seu editor não fizer isso pra você;
@@ -500,6 +500,17 @@ Agora, finalmente, vamos implementar a funcionalidade de reconhecimento de texto
      }
    ```
 
+3. Para o reconhecimento funcionar corretamente no iOS, adicione as seguintes linhas no arquivo `lib/ios/Podfile`:
+
+   ```ruby
+   pod 'Firebase/MLVisionBarcodeModel'
+   pod 'Firebase/MLVisionFaceModel'
+   pod 'Firebase/MLVisionLabelModel'
+   pod 'Firebase/MLVisionTextModel'
+   ```
+
+   Depois disso, navegue até `lib/ios` pelo terminal e execute `pod update`.
+
 ## Checkpoint 1
 
 Ufa! Já fizemos bastante coisa! Este é o primeiro *checkpoint* do tutorial, e o objetivo desta sessão é verificar se estamos andando juntos até agora. 
@@ -507,11 +518,124 @@ Ufa! Já fizemos bastante coisa! Este é o primeiro *checkpoint* do tutorial, e 
 Neste momento, há duas partes principais para garantir que está tudo indo bem:
 
 1. Seu setup está funcionando bem e você consegue executar e desenvolver a app com Flutter, em um simulador iOS sem problemas;
-2. Um usuário do seu app já consegue ver a lista de consultas que ele fez e realizar uma nova consulta usando imagens da galeria ou da câmera do celular. Novas consultas são adicionadas os topo do histórico.
+2. Um usuário do seu app já consegue ver a lista de consultas que ele fez e realizar uma nova consulta usando imagens da galeria ou da câmera do celular. Novas consultas são adicionadas ao topo do histórico.
 
 Se ambas as afirmações são verdadeiras pro seu caso, está tudo certo! Vamos para os próximos passos :)
 
 ## Login com Google
+
+Agora o próximo passo no nosso app é adicionar autenticação, usando o [Firebase Auth](https://firebase.google.com/docs/auth). Vamos implementar apenas a autenticação que utiliza contas da Google, ou seja, usuários vão acessar o app usando suas contas da Google.
+
+Esta foi a parte mais difícil durante o desenvolvimento, pois possui algumas particularidades e a documentação não é tão clara. Vou fazer o meu melhor para facilitar o passo-a-passo.
+
+### Página de login
+
+Vamos começar pela interface e criar a página de login do nosso app.
+
+1. Criei o arquivo `lib/LoginPage.dart` e preencha-o com o código:
+
+   ```dart
+   import 'package:flutter/material.dart';
+   
+   class LoginPage extends StatefulWidget {
+     @override
+     _LoginPageState createState() => _LoginPageState();
+   }
+   
+   class _LoginPageState extends State<LoginPage> {
+     @override
+     Widget build(BuildContext context) {
+       return Scaffold(
+         body: Container(
+           color: Color(0xFF34495e),
+           child: Center(
+             child: Column(
+               mainAxisSize: MainAxisSize.max,
+               mainAxisAlignment: MainAxisAlignment.center,
+               children: <Widget>[
+                 Image(
+                   image: AssetImage("assets/logo.png"),
+                 ),
+                 SizedBox(height: 50),
+                 _signInButton(),
+               ],
+             ),
+           ),
+         ),
+       );
+     }
+     
+     Widget _signInButton() {
+       return OutlineButton(
+         splashColor: Colors.grey,
+         onPressed: () {},
+         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(40)),
+         highlightElevation: 0,
+         borderSide: BorderSide(color: Colors.white),
+         child: Padding(
+           padding: const EdgeInsets.fromLTRB(0, 10, 0, 10),
+           child: Row(
+             mainAxisSize: MainAxisSize.min,
+             mainAxisAlignment: MainAxisAlignment.center,
+             children: <Widget>[
+               Image(image: AssetImage("assets/google_logo.png"), height: 35.0),
+               Padding(
+                 padding: const EdgeInsets.only(left: 10),
+                 child: Text(
+                   'Sign in with Google',
+                   style: TextStyle(
+                     fontSize: 20,
+                     color: Colors.white,
+                   ),
+                 ),
+               )
+             ],
+           ),
+         ),
+       );
+     }
+   }
+   ```
+
+   Note que por enquanto este código não vai funcionar, pois as imagens que ele tenta utilizar não existem no projeto.
+
+2. Baixe a pasta `assets` disponível em: https://drive.google.com/drive/folders/1f_N45Nxw6bC-oNVCZkTr5oRho5oJJc-3?usp=sharing;
+
+3. Mova a pasta `assets` para a raíz do diretório `pic_to_text`;
+
+4. Adicione o seguinte no arquivo `pubspec.yaml`:
+
+   ```yaml
+   # The following section is specific to Flutter.
+   flutter:
+     uses-material-design: true
+     assets:
+       - google_logo.png
+       - logo.png
+   ```
+
+5. Para verificar como está a tela de login, faça a seguinte mudança em `lib/main.dart`:
+
+   ```diff
+     Widget build(BuildContext context) {
+       return MaterialApp(
+         title: 'Pic to Text',
+         debugShowCheckedModeBanner: false,
+   -      home: HomePage(),
+   +      home: LoginPage(),
+       );
+     }
+   ```
+
+   A página de login do seu app deve estar como essa:
+
+   ![login_screen_1](./img/login_screen_1.png)
+
+### Usando o `firebase_auth`
+
+
+
+
 
 ## Checkpoint 2
 
