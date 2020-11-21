@@ -29,7 +29,7 @@ class _HomePageState extends State<HomePage> {
 
   CollectionReference _users = FirebaseFirestore.instance.collection('users');
 
-  final snackBar = SnackBar(content: Text('Copiado'));
+  final snackBar = SnackBar(content: Text('Copied to your clipboard'));
 
   var result = "";
 
