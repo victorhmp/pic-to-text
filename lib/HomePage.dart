@@ -6,10 +6,10 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:clipboard/clipboard.dart';
 import 'package:flutter_speed_dial/flutter_speed_dial.dart';
-import 'package:pic_to_text/LoadingState.dart';
 import 'package:provider/provider.dart';
-
 import 'package:image_picker/image_picker.dart';
+
+import 'package:pic_to_text/LoadingState.dart';
 import 'package:pic_to_text/AuthService.dart';
 
 class HomePage extends StatefulWidget {
@@ -24,7 +24,6 @@ class HomePage extends StatefulWidget {
 class _HomePageState extends State<HomePage> {
   final ImagePicker picker = ImagePicker();
 
-  String string = "TextRecognition";
   File _userImageFile;
 
   CollectionReference _users = FirebaseFirestore.instance.collection('users');
