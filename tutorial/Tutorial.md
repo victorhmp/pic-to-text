@@ -629,17 +629,435 @@ Vamos começar pela interface e criar a página de login do nosso app.
 
    A página de login do seu app deve estar como essa:
 
-   ![login_screen_1](./img/login_screen_1.png)
+   <img src="./img/login_screen_1.png" zoom="25%" />
 
-### Usando o `firebase_auth`
+### Preparando o app para usar o `firebase_auth`
 
+Agora vamos habilitar o login com Google no Firebase e fazer as primeiras alterações no nosso app para ter certeza de que conseguimos lidar com a inicialização do Firebase. Essa parte pode causar alguns problemas bem chatos de debuggar, então siga com atenção os próximos passos.
 
+1. Vá para o [Console do Firebase](https://console.firebase.google.com/) e selecione o PicToText;
 
+2. No menu do lado esquerdo, selecione "Authentication";
 
+3. Na aba "Sign-in method", ative o login com Google;
+
+   <img src="./img/firebase_console_auth.png" alt="firebase_console_auth" style="zoom:40%;" />
+
+4. Adicione as dependências [firebase_auth](https://pub.dev/packages/firebase_auth) e [google_sign_in](https://pub.dev/packages/google_sign_in) no seu `pubspec.yaml`:
+
+   ```yaml
+   dependencies:
+     firebase_auth: "^0.18.3"
+     google_sign_in: ^4.5.6
+   ```
+
+5. No arquivo `lib/main.dart`, faça as seguintes alterações:
+
+   ```diff
+   +import 'package:firebase_core/firebase_core.dart';
+   
+    void main() {
+   +  WidgetsFlutterBinding.ensureInitialized();
+      return runApp(MyApp());
+    }
+    
+    class MyApp extends StatelessWidget {
+   +  final Future<FirebaseApp> _initialization = Firebase.initializeApp();
+   ```
+
+6. Ainda no mesmo arquivo, substitua o método `build` da classe `MyApp` por:
+
+   ```dart
+     @override
+     Widget build(BuildContext context) {
+       return FutureBuilder(
+         future: _initialization,
+         builder: (context, snapshot) {
+           if (snapshot.hasError) {
+             return Container();
+           }
+   
+           if (snapshot.connectionState == ConnectionState.done) {
+             return MaterialApp(
+               title: 'Pic to Text',
+               debugShowCheckedModeBanner: false,
+               home: LoginPage(),
+             );
+           }
+         },
+       );
+     }
+   ```
+
+   Essa mudança garante que o nosso app só seja de fato iniciado quando uma instância de conexão com o Firebase foi criada;
+
+7. Vamos colocar também um estado rápido de *loading* que será visto pelo usuário enquanto o Firebase não inicializa. Crie um arquivo `lib/LoadingCircle.dart` e coloque o seguinte:
+
+   ```dart
+   import 'package:flutter/material.dart';
+   
+   class LoadingCircle extends StatelessWidget {
+     @override
+     Widget build(BuildContext context) {
+       return Center(
+         child: Container(
+           child: CircularProgressIndicator(),
+           alignment: Alignment(0.0, 0.0),
+         ),
+       );
+     }
+   }
+   ```
+
+8. Adicione o seguinte no método `build` da classe `MyApp`:
+
+   ```diff
+   +import 'package:pic_to_text/LoginCircle.dart';
+   
+   // ...
+          if (snapshot.connectionState == ConnectionState.done) {
+             return MaterialApp(
+               title: 'Pic to Text',
+               debugShowCheckedModeBanner: false,
+               home: LoginPage(),
+             );
+           }
+           
+   +       return LoadingCircle();
+         },
+       );
+   ```
+
+   
+
+### Fazendo login e persistindo o estado da aplicação
+
+No momento nosso app já tem tudo que precisa para conseguir usar o serviço de autenticação do Firebase! Agora vamos implementar a lógica de *login* e *logout* e garantir que o estado de autenticação do usuário seja persistente, ou seja, quando um usuário sair da aplicação e voltar suas credenciais não sejam perdidas, e ele vá direto para a tela de histórico. Esta é outra parte em que encontrei dificuldades quando estava desenvolvendo e também pode gerar error difíceis de lidar, então siga os passos abaixo com atenção.
+
+Nesta subsessão, vamos utilizar conceitos melhores descritos em [Simple app state management in Flutter](https://flutter.dev/docs/development/data-and-backend/state-mgmt/simple).
+
+1. Crie o arquivo `lib/AuthService.dart`, onde vamos colocar toda a lógica de comunicação com o Firebase;
+
+2. Importe as bibliotecas que vamos utilizar:
+
+   ```dart
+   import 'dart:async';
+   
+   import 'package:firebase_auth/firebase_auth.dart';
+   import 'package:google_sign_in/google_sign_in.dart';
+   import 'package:flutter/cupertino.dart';
+   ```
+
+3. Crie uma nova classe que extende a classe `ChangeNotifier`, com o seguinte corpo:
+
+   ```dart
+   class AuthService with ChangeNotifier {
+     final FirebaseAuth _auth = FirebaseAuth.instance;
+     final GoogleSignIn googleSignIn = GoogleSignIn();
+   
+     Future<User> getUser() {
+       return Future(() => _auth.currentUser);
+     }
+   
+     Future logout() async {
+       await googleSignIn.signOut();
+   
+       await FirebaseAuth.instance.signOut();
+   
+       notifyListeners();
+     }
+   
+     Future<User> loginUser() async {
+       try {
+         final GoogleSignInAccount googleSignInAccount =
+             await googleSignIn.signIn();
+   
+         final GoogleSignInAuthentication googleSignInAuthentication =
+             await googleSignInAccount.authentication;
+   
+         final AuthCredential credential = GoogleAuthProvider.credential(
+           accessToken: googleSignInAuthentication.accessToken,
+           idToken: googleSignInAuthentication.idToken,
+         );
+   
+         final UserCredential authResult =
+             await _auth.signInWithCredential(credential);
+   
+         final User user = authResult.user;
+   
+         notifyListeners();
+   
+         return user;
+       } catch (e) {
+         throw new FirebaseAuthException(
+           code: e.code,
+           message: e.message,
+         );
+       }
+     }
+   }
+   ```
+
+   `AuthService`é a classe que serve como nossa API para gerenciar o estado de autenticação do app;
+
+4. Adicione a biblioteca `provider` no seu `pubspec.yaml`:
+
+   ```yaml
+   dependencies:
+     provider: ^3.0.0
+   ```
+
+   Essa é a biblioteca de gerenciamento de estado que vamos utilizar;
+
+5. No arquivo `lib/LoginPage.dart`, vamos fazer o nosso botão de *login* funcionar! Basta importar a classe que criamos no passo anterior (`import 'package:pic_to_text/AuthService.dart'`) e preencher o corpo da função vazia que passamos para o parâmetro `onPressed` do `OutlineButton` que retornamos no `_signInButton`:
+
+   ```diff
+   + import 'package:pic_to_text/AuthService.dart';
+   
+   // ...
+   
+   Widget _signInButton() {
+       return OutlineButton(
+         splashColor: Colors.grey,
+   +     onPressed: () async {
+   +       await Provider.of<AuthService>(context).loginUser();
+   +     },
+         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(40)),
+   ```
+
+6. Agora a parte mais importante, prover o estado atual de autenticação e escutar por mudanças. No arquivo `lib/main.dart`, dentro do método `build`, mude o conteúdo dentro do bloco executado sob a condicional `if (snapshot.connectionState == ConnectionState.done)` para que seja o seguinte:
+
+   ```dart
+   if (snapshot.connectionState == ConnectionState.done) {
+     return ChangeNotifierProvider(
+         create: (context) => AuthService(),
+         child: Consumer<AuthService>(
+           builder: (context, provider, child) => MaterialApp(
+             title: 'Pic to Text',
+             debugShowCheckedModeBanner: false,
+             home: FutureBuilder(
+               future: Provider.of<AuthService>(context).getUser(),
+               builder: (context, AsyncSnapshot snapshot) {
+                 if (snapshot.connectionState == ConnectionState.done) {
+                   return snapshot.hasData
+                       ? HomePage()
+                       : LoginPage();
+                 } else {
+                   return LoadingCircle();
+                 }
+               },
+             ),
+           ),
+         ));
+   }
+   ```
+
+   Neste ponto, a funcionalidade de *login* já deve estar completamente funcional! Da primeira vez que o usuário acessar o app, sem estar autenticado, ele verá a página de login (nossa `LoginPage`). Depois de fazer login, quando voltar ao app ele vai direto para a `Home`, com o histórico de consultas.
+
+### Adicionando uma drawer e permitindo logout
+
+Acabamos de implementar a funcionalidade de login no app, e a sua persistência. Mas ainda precisamos adicionar a possibilidade do usuário fazer logout da sua conta. A lógica para o processo de login já foi implementada, quando criamos o `AuthService`, agora basta suportar a ação na interface.
+
+Além disso, vamos adicionar uma *drawer* que mostrará ao usuário informações sobre a conta em que ele está logado no momento.
+
+1. Em `lib/HomePage.dart`, importe o `AuthService`e a biblioteca `provider`:
+
+   ```dart
+   import 'package:provider/provider.dart';
+   
+   import 'package:pic_to_text/AuthService.dart';
+   ```
+
+2. Adicione o seguinte no `IconButton` dentro da `AppBar` que é retornada no método de `build` da classe `_HomePageState`:
+
+   ```diff
+   return Scaffold(
+         appBar: AppBar(
+           elevation: 0,
+           title: Text('Pic to Text'),
+           backgroundColor: Color(0xFFf1c40f),
+           actions: [
+             IconButton(
+   +            onPressed: () async {
+   +              await Provider.of<AuthService>(context).logout();
+   +           },
+               icon: Icon(Icons.logout),
+             )
+           ],
+         ),
+   ```
+
+   Essa mudança sozinha já deve fazer com que um toque no ícone no canto esquerdo da `AppBar` permita o logout de um usuário autenticado;
+
+3. Ainda no mesmo arquivo, crie um novo *stateful widget*, essa será a nossa *drawer*:
+
+   ```dart
+   class HomeDrawer extends StatefulWidget {
+     final User currentUser;
+   
+     HomeDrawer(this.currentUser);
+   
+     @override
+     _HomeDrawerState createState() => _HomeDrawerState();
+   }
+   
+   class _HomeDrawerState extends State<HomeDrawer> {
+     @override
+     Widget build(BuildContext context) {
+       return Drawer(
+         child: Column(
+           mainAxisAlignment: MainAxisAlignment.center,
+           mainAxisSize: MainAxisSize.max,
+           children: <Widget>[
+             CircleAvatar(
+               backgroundImage: NetworkImage(
+                 widget.currentUser.photoURL,
+               ),
+               radius: 80,
+               backgroundColor: Colors.transparent,
+             ),
+             SizedBox(height: 40),
+             Text(
+               'NAME',
+               style: TextStyle(
+                 fontSize: 18,
+                 fontWeight: FontWeight.bold,
+                 color: Colors.black54,
+               ),
+             ),
+             Text(
+               widget.currentUser.displayName,
+               style: TextStyle(
+                 fontSize: 16,
+                 color: Color(0xFF34495e),
+                 fontWeight: FontWeight.bold,
+               ),
+             ),
+             SizedBox(height: 20),
+             Text(
+               'EMAIL',
+               style: TextStyle(
+                   fontSize: 18,
+                   fontWeight: FontWeight.bold,
+                   color: Colors.black54),
+             ),
+             Text(
+               widget.currentUser.email,
+               style: TextStyle(
+                   fontSize: 16,
+                   color: Color(0xFF34495e),
+                   fontWeight: FontWeight.bold),
+             ),
+             SizedBox(height: 40),
+             RaisedButton(
+               onPressed: () async {
+                 await Provider.of<AuthService>(context).logout();
+               },
+               color: Color(0xFFf1c40f),
+               child: Padding(
+                 padding: const EdgeInsets.all(8.0),
+                 child: Text(
+                   'Sign Out',
+                   style: TextStyle(
+                     fontSize: 16,
+                     color: Colors.white,
+                   ),
+                 ),
+               ),
+               elevation: 5,
+               shape: RoundedRectangleBorder(
+                 borderRadius: BorderRadius.circular(40),
+               ),
+             )
+           ],
+         ),
+       );
+     }
+   }
+   ```
+
+4. Ainda no mesmo arquivo, vamos adaptar as classes `HomePage` e `_HomePageState`para receber as informações do usuário logado e renderizar a *drawer* que acabamos de criar:
+
+   ```dart
+   class HomePage extends StatefulWidget {
+     final User currentUser;
+   
+     HomePage(this.currentUser);
+   
+     @override
+     _HomePageState createState() => _HomePageState();
+   }
+   ```
+
+   ```diff
+   @override
+     Widget build(BuildContext context) {
+       return Scaffold(
+         appBar: AppBar(
+           elevation: 0,
+           title: Text('Pic to Text'),
+           backgroundColor: Color(0xFFf1c40f),
+           actions: [
+             IconButton(
+               onPressed: () async {
+                 await Provider.of<AuthService>(context).logout();
+               },
+               icon: Icon(Icons.logout),
+             )
+           ],
+         ),
+   +     drawer: HomeDrawer(widget.currentUser),
+         body: History(
+   ```
+
+5. Agora em `lib/main.dart`, passe as informações do usuário logado para o widget `HomePage`:
+
+   ```diff
+   if (snapshot.connectionState == ConnectionState.done) {
+     return ChangeNotifierProvider(
+         create: (context) => AuthService(),
+         child: Consumer<AuthService>(
+           builder: (context, provider, child) => MaterialApp(
+             title: 'Pic to Text',
+             debugShowCheckedModeBanner: false,
+             home: FutureBuilder(
+               future: Provider.of<AuthService>(context).getUser(),
+               builder: (context, AsyncSnapshot snapshot) {
+                 if (snapshot.connectionState == ConnectionState.done) {
+                   return snapshot.hasData
+   -                   ? HomePage()
+   +                   ? HomePage(snapshot.data)
+                       : LoginPage();
+                 } else {
+                   return LoadingCircle();
+                 }
+               },
+             ),
+           ),
+         ));
+   }
+   ```
+
+   
 
 ## Checkpoint 2
 
+Parabéns, você terminou a parte mais complicada do tutorial! Espero que a explicação tenha tornado o processo mais simples.
+
+Neste *checkpoint*, o fluxo completo de login e logout do seu app deve estar totalmente funcional. Um usuário deve conseguir fazer login com uma conta do Google, ser levado para a `HomePage`, com o histórico de consultas dele e a opção de realizar novas consultas. Na `HomePage` o usuário deve conseguir ver as informações sobre o seu login ou fazer logout abrindo a *drawer* do lado esquerdo, ou fazer logout pela `AppBar`.
+
+Seu app já deve estar como este:
+
+<div style="display: 'flex'">
+  <img src="./img/login.png" width="24%" />
+	<img src="./img/home_page_4.png" width="24%" />
+  <img src="./img/drawer_open_2.png" width="24%" />
+  <img src="./img/action_open_2.png" width="24%" />
+</div>
+
 ## Armazenando dados na nuvem
+
+**Nota**: não esquecer de adicionar a funcionalidade de copiar para o clipboard quando for adicionar a funcionalidade de deletar itens do histórico.
 
 ## Checkpoint 3
 
