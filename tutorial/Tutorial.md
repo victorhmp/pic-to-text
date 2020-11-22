@@ -248,7 +248,12 @@ Vamos criar a primeira tela básica do app, que será a nossa tela inicial por e
 
    Quando salvar este arquivo, seu app deve mostrar o seguinte:
 
-   <img src="./img/home_page_1.png" style="zoom:25%;" /> <img src="./img/home_page_2.png" style="zoom:25%;" />
+   <div style="display: 'flex'">
+     <img src="./img/home_page_1.png" width="45%" />
+   	<img src="./img/home_page_2.png" width="45%" />
+   </div>
+   
+   
 
 ### Escolhendo uma imagem
 
@@ -404,7 +409,7 @@ Vamos primeiro preparar a interface para mostrar o histórico de consultas feita
 
    Agora o seu app deve estar assim:
 
-   <img src="./img/home_page_3.png" alt="home_page_3" style="zoom:25%;" />
+   <img src="./img/home_page_3.png" alt="home_page_3" style="width: 50%;" />
 
 4. Vamos também criar uma função dentro da classe `HomePageState` que vai permitir a adição de itens no histórico:
 
@@ -629,7 +634,7 @@ Vamos começar pela interface e criar a página de login do nosso app.
 
    A página de login do seu app deve estar como essa:
 
-   <img src="./img/login_screen_1.png" zoom="25%" />
+   <img src="./img/login_screen_1.png" style="width: 50%" />
 
 ### Preparando o app para usar o `firebase_auth`
 
