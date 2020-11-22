@@ -1059,9 +1059,326 @@ Seu app já deve estar como este:
 
 **Nota**: não esquecer de adicionar a funcionalidade de copiar para o clipboard quando for adicionar a funcionalidade de deletar itens do histórico.
 
+Chegamos à parte final do tutorial! Agora que já conseguimos digitalizar o texto presente em uma imagem, e já temos um sistema de login com Google, a única funcionalidade que ainda não fizemos é o armazenamento dos dados individualizado, de maneira que cada usuário tenha os seu próprio histórico de consultas. Esse histórico ainda deve estar associado à conta deste usuário no nosso app. Para conseguir implementar essa funcionalidade, vamos novamente usar o Firebase. Mais especificamente, o serviço chamado [Cloud Firestore](https://firebase.google.com/docs/firestore), um banco de dados *NoSQL* na nuvem.
+
+Vamos também adicionar pequenas funcionalidades para melhorar a usabilidade do app, como: ao tocar em algum item do histórico, seu texto é copiado para o *clipboard* do usuário, e a opção de remover itens do histórico.
+
+### Ativando o Cloud Firestore
+
+Antes de utilizarmos o Cloud Firestore no nosso app, precisamos ativá-lo no [Console do Firebase](https://console.firebase.google.com/).
+
+1. Acesse o seu [console](https://console.firebase.google.com/);
+
+2. Na barra de navegação do lado esquerdo, selecione "Cloud Firestore";
+
+3. Clique em "Criar banco de dados";
+
+4. No pop-up que apareceu, selecione "Iniciar no modo de teste";
+
+5. Escolha o local do Cloud Firestore que fizer mais sentido para você e clique em "Ativar";
+
+6. Assim que o banco for criado, vá até a aba "Regras". É nela que podemos especificar regras de acesso ao conteúdo do nosso banco de dados;
+
+7. Adicione a seguinte regra de acesso:
+
+   ```js
+   service cloud.firestore {
+     match /databases/{database}/documents {
+       match /users/{userId} {
+      		allow read, update, delete: if request.auth.uid == userId;
+   		}
+     }
+   }
+   ```
+
+   Com ela, usuários logados terão acesso apenas aos seus próprios dados, e qualquer acesso por usuário não logados será bloqueado.
+
+### Criando a coleção de usuários e seus documentos
+
+Agora que temos o banco de dados criado, precisamos populá-lo.
+
+Como queremos armazenar o histórico de consultas realizadas por cada usuário individualmente, nosso banco vai ser constituído de uma coleção (ou *collection*) chamada `users`, onde cada documento possui como ID, o `uid` de um usuário, que conseguimos pelo serviço de autenticação do Firebase. O corpo do documento vai possuir apenas um atributo `history` de tipo  `array`, que vai ser de fato o histórico de consultas do usuário.
+
+Para nosso plano funcionar, precisamos ter certeza de que, ao fazer login pela primeira vez, seja criado um documento no banco de dados com o ID igual ao `uid` do usuário que acabou de entrar. Vamos implementar essa funcionalidade:
+
+1. Adicione a dependência [cloud_firestore](https://pub.dev/packages/cloud_firestore) no projeto:
+
+   ```yaml
+   dependencies:
+     cloud_firestore: "^0.14.3"
+   ```
+
+2. No arquivo `lib/AuthService.dart`, adicione uma nova variável de instância, que será a instância do Firestore que vamos usar:
+
+   ```diff
+   class AuthService with ChangeNotifier {
+     final FirebaseAuth _auth = FirebaseAuth.instance;
+     final GoogleSignIn googleSignIn = GoogleSignIn();
+   + final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+   ```
+
+3. Ainda no mesmo arquivo, o método `loginUser` deve ser o seguinte:
+
+   ```dart
+   Future<User> loginUser() async {
+       try {
+         final GoogleSignInAccount googleSignInAccount =
+             await googleSignIn.signIn();
+   
+         final GoogleSignInAuthentication googleSignInAuthentication =
+             await googleSignInAccount.authentication;
+   
+         final AuthCredential credential = GoogleAuthProvider.credential(
+           accessToken: googleSignInAuthentication.accessToken,
+           idToken: googleSignInAuthentication.idToken,
+         );
+   
+         final UserCredential authResult =
+             await _auth.signInWithCredential(credential);
+   
+         final User user = authResult.user;
+   
+         var userDocument =
+             await _firestore.collection('users').doc(user.uid).get();
+   
+         if (!userDocument.exists) {
+           _firestore.collection('users').doc(user.uid).set(
+             {'history': []},
+           );
+         }
+   
+         notifyListeners();
+   
+         return user;
+       } catch (e) {
+         throw new FirebaseAuthException(
+           code: e.code,
+           message: e.message,
+         );
+       }
+     }
+   ```
+
+   Com isso garantimos que no primeiro acesso de um usuário, será criado um documento para ele no banco de dados, onde iremos guardar seu histórico. Para testar essa função, e ver o novo documento sendo criado no Firestore, faça logout e login novamente no seu app.
+
+### Utilizando e alterando dados da nuvem
+
+Agora temos tudo o que precisamos para parar de usar um histórico *mockado* na nossa `HomePage` e de fato usar o histórico real de cada usuário! Vamos fazer as alterações necessárias em `lib/HomePage`.
+
+1. Em `lib/HomePage.dart`:
+
+   ```dart
+   import 'package:cloud_firestore/cloud_firestore.dart';
+   
+   // ...
+   
+   class _HomePageState extends State<HomePage> {
+     CollectionReference _users = FirebaseFirestore.instance.collection('users');
+     // ...
+   ```
+
+2. Na classe `History`, adicione uma nova variável de instância:
+
+   ```dart
+   final _users = FirebaseFirestore.instance.collection('users');
+   ```
+
+3. Adicione um novo método, `_removeFromHistory`, que vamos utilizar em breve para remover itens do histórico:
+
+   ```dart
+     Future<void> _removeFromHistory(String uid, int idx) async {
+       var userCurrentDocument =
+           await FirebaseFirestore.instance.collection('users').doc(uid).get();
+   
+       var currentHistory = userCurrentDocument.data()['history'];
+       currentHistory.removeAt(idx);
+   
+       return _users.doc(uid).update({
+         'history': currentHistory,
+       });
+     }
+   ```
+
+4. Agora, o método `build` da classe `History` deve ser o seguinte:
+
+   ```dart
+     @override
+     Widget build(BuildContext context) {
+       DocumentReference userDocumentReference = _users.doc(this.userId);
+   
+       return StreamBuilder(
+         stream: userDocumentReference.snapshots(),
+         builder: (context, snapshot) {
+           if (snapshot.hasError) {
+             return Text("Something went wrong");
+           }
+   
+           if (snapshot.connectionState == ConnectionState.waiting) {
+             return LoadingCircle();
+           }
+   
+           var historyFromCloudStorage = snapshot.data['history'];
+   
+           return ListView.builder(
+               padding: const EdgeInsets.all(8),
+               itemCount: historyFromCloudStorage.length,
+               itemBuilder: (BuildContext context, int index) {
+                 return ListTile(
+                   title: Text(
+                     '${historyFromCloudStorage[index]}',
+                   ),
+                   trailing: FlatButton(
+                     onPressed: () {},
+                     child: Icon(
+                       Icons.remove_circle,
+                       color: Colors.red,
+                     ),
+                   ),
+                   onTap: () {},
+                 );
+               });
+         },
+       );
+     }
+   ```
+
+   Assim a lista que vamos renderizar no widget agora está vindo do Firestore! Note que adicionamos também um `FlatButton` que é passado no atributo `trailing` dos nossos `ListTiles`, esse botão será para remover itens;
+
+5. Mude a inicialização da classe `History` para o seguinte:
+
+   ```dart
+   History({
+       Key key,
+       @required this.userId,
+     }) : super(key: key);
+   
+     final String userId;
+     final _users = FirebaseFirestore.instance.collection('users');
+   ```
+
+   Agora a classe não recebe mais uma variável `history` pronta, mas busca no Firestore o seu conteúdo;
+
+6. Na classe `_HomePageState`, precisamos alterar nossa chamada a `History`, já que sua assinatura mudou. Faça a seguinte mudança:
+
+   ```diff
+   body: History(
+   -				history: history, 
+   +       userId: widget.currentUser.uid,
+         ),
+   ```
+
+7. Atualize o método `_addToHistory` para também usar os dados do Firestore:
+
+   ```dart
+     Future<void> _addToHistory(String text, String uid) async {
+       var userCurrentDocument =
+           await FirebaseFirestore.instance.collection('users').doc(uid).get();
+   
+       var currentHistory = userCurrentDocument.data()['history'];
+       currentHistory.insert(0, text);
+   
+       return _users.doc(uid).update({
+         'history': currentHistory,
+       });
+     }
+   ```
+
+8. Agora novamente na classe `History`, vamos habilitar a deleção de itens do histórico. Basta fazer a seguinte alteração:
+
+   ```diff
+   return ListTile(
+                   title: Text(
+                     '${historyFromCloudStorage[index]}',
+                   ),
+                   trailing: FlatButton(
+   +                 onPressed: () {
+   +                  this._removeFromHistory(this.userId, index);
+   +                 },
+                     child: Icon(
+                       Icons.remove_circle,
+                       color: Colors.red,
+                     ),
+                   ),
+   ```
+
+### Copiando itens para o clipboard
+
+Nossa app está quase pronta! Vamos adicionar a última, mas não menos importante, funcionalidade: copiar um item do histórico para o *clipboard* do dispositivo.
+
+1. Adicione a dependência [clipboard](https://pub.dev/packages/clipboard) abaixo no `pubspec.yaml`:
+
+   ```yaml
+   dependencies:
+   	clipboard: ^0.1.2+8
+   ```
+
+2. Em `lib/HomePage.dart`, importe a biblioteca:
+
+   ```dart
+   import 'package:clipboard/clipboard.dart';
+   ```
+
+3. Dentro do método `build` em da classe `History`, em `lib/HomePage.dart`, faça a seguinte mudança:
+
+   ```diff
+   return ListView.builder(
+               padding: const EdgeInsets.all(8),
+               itemCount: historyFromCloudStorage.length,
+               itemBuilder: (BuildContext context, int index) {
+                 return ListTile(
+                   title: Text(
+                     '${historyFromCloudStorage[index]}',
+                   ),
+                   trailing: FlatButton(
+                     onPressed: () {
+                       this._removeFromHistory(this.userId, index);
+                     },
+                     child: Icon(
+                       Icons.remove_circle,
+                       color: Colors.red,
+                     ),
+                   ),
+   +                onTap: () {
+   +                 FlutterClipboard.copy(
+   +                   historyFromCloudStorage[index],
+   +                 );
+                   },
+                 );
+               });
+   ```
+
+   Agora seria interessante mostrar pro usuário um feedback de que o conteúdo foi de fato copiado para o *clipboard*. 
+
+4. Vamos usar o widget `Snackbar` para mostrar uma mensagem avisando o usuário de que o texto foi copiado para o *clipboard*. Adicione uma nova variável de instância na classe `History`:
+
+   ```dart
+   final snackBar = SnackBar(content: Text('Copied to your clipboard'));
+   ```
+
+5. Adicione um *callback* à chamada de `FlutterClipboard.copy()`:
+
+   ```diff
+   onTap: () {
+      FlutterClipboard.copy(
+        historyFromCloudStorage[index],
+   +  ).then((value) {
+   +   Scaffold.of(context).showSnackBar(snackBar);
+   + });
+    },
+   ```
+
+   Pronto! Agora quando o texto é copiado para o *clipboard*, o usuário fica sabendo.
+
 ## Checkpoint 3
 
-## Próximos passos
+Conseguimos! Este é o último *checkpoint*. Agora o seu app deve estar completo. Desde o fluxo de login e logout, até ler e alterar dados da nuvem. Além de ser capaz de reconhecer texto em imagens! O resultado final deve estar como as fotos que mostrei no início do tutorial:
+
+<div style="display: 'flex'">
+  <img src="./img/login.png" width="24%" />
+	<img src="./img/home.png" width="24%" />
+  <img src="./img/drawer_open.png" width="24%" />
+  <img src="./img/action_open.png" width="24%" />
+</div>
 
 ## Comentários finais (para o professor)
 
