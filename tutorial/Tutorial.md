@@ -1309,7 +1309,7 @@ Nossa app está quase pronta! Vamos adicionar a última, mas não menos importan
 
    ```yaml
    dependencies:
-   	clipboard: ^0.1.2+8
+     clipboard: ^0.1.2+8
    ```
 
 2. Em `lib/HomePage.dart`, importe a biblioteca:
