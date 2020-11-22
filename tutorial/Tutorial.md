@@ -1247,7 +1247,7 @@ Agora temos tudo o que precisamos para parar de usar um histórico *mockado* na 
 5. Mude a inicialização da classe `History` para o seguinte:
 
    ```dart
-   History({
+     History({
        Key key,
        @required this.userId,
      }) : super(key: key);
@@ -1262,7 +1262,7 @@ Agora temos tudo o que precisamos para parar de usar um histórico *mockado* na 
 
    ```diff
    body: History(
-   -				history: history, 
+   -       history: history, 
    +       userId: widget.currentUser.uid,
          ),
    ```
