@@ -28,8 +28,6 @@ class _HomePageState extends State<HomePage> {
 
   CollectionReference _users = FirebaseFirestore.instance.collection('users');
 
-  final snackBar = SnackBar(content: Text('Copied to your clipboard'));
-
   var result = "";
 
   Future<void> _addToHistory(String text, String uid) async {
@@ -89,8 +87,8 @@ class _HomePageState extends State<HomePage> {
           )
         ],
       ),
+      drawer: HomeDrawer(widget.currentUser),
       body: History(
-        snackBar: snackBar,
         userId: widget.currentUser.uid,
       ),
       floatingActionButton: SpeedDial(
@@ -111,7 +109,6 @@ class _HomePageState extends State<HomePage> {
           ),
         ],
       ),
-      drawer: HomeDrawer(widget.currentUser),
     );
   }
 }
@@ -119,13 +116,12 @@ class _HomePageState extends State<HomePage> {
 class History extends StatelessWidget {
   History({
     Key key,
-    @required this.snackBar,
     @required this.userId,
   }) : super(key: key);
 
-  final SnackBar snackBar;
   final String userId;
   final _users = FirebaseFirestore.instance.collection('users');
+  final snackBar = SnackBar(content: Text('Copied to your clipboard'));
 
   Future<void> _removeFromHistory(String uid, int idx) async {
     var userCurrentDocument =
