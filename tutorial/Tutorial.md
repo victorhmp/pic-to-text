@@ -22,6 +22,35 @@ As imagens abaixo mostram o estado final do app rodando em um iPhone.
   <img src="./img/action_open.png" width="24%" />
 </div>
 
+## Índice
+
+* [Setup e ferramentas](#setup-e-ferramentas)
+  * [Flutter \+ Xcode](#flutter--xcode)
+  * [VSCode](#vscode)
+  * [Validando o setup de desenvolvimento](#validando-o-setup-de-desenvolvimento)
+  * [Firebase](#firebase)
+* [Interagindo com a câmera e a galeria de imagens do dispositivo](#interagindo-com-a-c%C3%A2mera-e-a-galeria-de-imagens-do-dispositivo)
+  * [Primeira iteração da interface](#primeira-itera%C3%A7%C3%A3o-da-interface)
+  * [Escolhendo uma imagem](#escolhendo-uma-imagem)
+* [Reconhecendo texto](#reconhecendo-texto)
+  * [Preparando a interface](#preparando-a-interface)
+  * [Adicionando Firebase](#adicionando-firebase)
+  * [Usando o firebase\_ml\_vision](#usando-o-firebase_ml_vision)
+* [Checkpoint 1](#checkpoint-1)
+* [Login com Google](#login-com-google)
+  * [Página de login](#p%C3%A1gina-de-login)
+  * [Preparando o app para usar o firebase\_auth](#preparando-o-app-para-usar-o-firebase_auth)
+  * [Fazendo login e persistindo o estado da aplicação](#fazendo-login-e-persistindo-o-estado-da-aplica%C3%A7%C3%A3o)
+  * [Adicionando uma drawer e permitindo logout](#adicionando-uma-drawer-e-permitindo-logout)
+* [Checkpoint 2](#checkpoint-2)
+* [Armazenando dados na nuvem](#armazenando-dados-na-nuvem)
+  * [Ativando o Cloud Firestore](#ativando-o-cloud-firestore)
+  * [Criando a coleção de usuários e seus documentos](#criando-a-cole%C3%A7%C3%A3o-de-usu%C3%A1rios-e-seus-documentos)
+  * [Utilizando e alterando dados da nuvem](#utilizando-e-alterando-dados-da-nuvem)
+  * [Copiando itens para o clipboard](#copiando-itens-para-o-clipboard)
+* [Checkpoint 3](#checkpoint-3)
+* [Comentários finais (para o professor)](#coment%C3%A1rios-finais-para-o-professor)
+
 ## Setup e ferramentas
 
 Esta é a sessão menos divertida de qualquer tutorial, mas precisamos garantir que temos um setup funcionando bem para facilitar nosso fluxo de desenvolvimento.
@@ -1387,5 +1416,16 @@ Conseguimos! Este é o último *checkpoint*. Agora o seu app deve estar completo
 
 ## Comentários finais (para o professor)
 
+Olá professor! Reservei esta sessão final para alguns comentários rápidos sobre o desenvolvimento do projeto.
 
+Logo antes de começar o desenvolvimento, minha dupla para o trabalho sumiu 😅. Como ele não assistiu nenhuma aula desde o começo da disciplina, assumi que havia desistido da matéria. Com isso, acabei fazendo o trabalho sozinho.
 
+Nunca tinha mexido com desenvolvimento de apps mobile antes, esta foi minha primeira experiência. Acabei escolhendo desenvolver para o iOS pois achei que as ferramentas funcionam muito bem, e poderia usar o meu celular para testes com a câmera. 
+
+Minha experiência é com desenvolvimento para Web. então tentei começar o projeto usando React Native, com o Expo, que tornava o setup de tudo mais simples... mas rapidamente tive a impressão de que a ferramentas estava mais atrapalhando do que ajudando, principalmente quando queria usar o Firebase. Foi então que tive a ideia de começar de novo, usando Flutter como framework de desenvolvimento. Gostei muito da experiência de desenvolvimento! O Flutter é muito bem feito, e tem uma coleção muito boa de bibliotecas oficiais, feitas pelo próprio time do projeto. Sua integração com Firebase também é bem mais simples, e muita coisa funciona out-of-the-box.
+
+Senti um pouco a minha falta de experiência em alguns momentos em que precisava debuggar erros mais específicos, que envolviam o Xcode ou coisas do tipo. Toda a parte da autenticação e manutenção do estado da aplicação foi com certeza a mais difícil. Tentei deixar tudo bem mais simples no tutorial, espero que possa ajudar alguém que queira implementar algumas das funcionalidades deste app em algum outro.
+
+Por fim, queria dizer que achei a ideia de colocar este Projeto Final na disciplina, e ter avisado como ele iria ser logo no começo da disciplina foi ótimo! Fez eu aprender algumas coisas novas, e experimentar muitas coisas na prática. 
+
+Obrigado! 😄
